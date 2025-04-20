@@ -200,7 +200,7 @@ export default function DashboardPage() {
                     <span>Ver Todos Pedidos</span>
                   </Link>
                 </motion.div>
-                {user?.nivel_acesso === 'administrador' && (
+                {user?.nivel_acesso === 'admin' && (
                   <motion.div whileHover={{ scale: 1.02 }}>
                     <Link
                       href="/dashboard/usuarios"

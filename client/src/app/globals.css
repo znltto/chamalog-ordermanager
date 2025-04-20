@@ -24,3 +24,20 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Após os estilos existentes */
+@supports not (backdrop-filter: blur(4px)) {
+  .backdrop-blur-sm {
+    background-color: rgba(107, 114, 128, 0.75); /* bg-gray-500 com opacidade 75% */
+  }
+}
+
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px); /* Suporte ao Safari */
+}
+
+select option {
+  background-color: #ffffff; /* Fundo branco */
+  color: #1f2937; /* text-gray-900 */
+}

@@ -128,7 +128,7 @@ export default function UsuariosPage() {
       });
       toast.success('Loja criada com sucesso');
       setModalOpen(false);
-      fetchData(); // Refresh lojas
+      fetchData();
       resetLojaForm();
     } catch (error) {
       console.error('Erro ao criar loja:', error);
@@ -345,14 +345,14 @@ export default function UsuariosPage() {
         {user?.nivel_acesso === 'admin' && (
           <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
             {modalType === 'user' && (
-              <>
+              <div className="relative z-60 bg-white opacity-100">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">
                   {editMode ? 'Editar Usuário' : 'Criar Novo Usuário'}
                 </h2>
                 <form onSubmit={handleUserSubmit}>
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="nome" className="block text-sm font-medium text-gray-900 mb-1">
                         Nome Completo
                       </label>
                       <input
@@ -361,13 +361,12 @@ export default function UsuariosPage() {
                         name="nome"
                         value={userFormData.nome}
                         onChange={handleUserInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                         required
                       />
                     </div>
-
                     <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-1">
                         Email
                       </label>
                       <input
@@ -376,15 +375,14 @@ export default function UsuariosPage() {
                         name="email"
                         value={userFormData.email}
                         onChange={handleUserInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                         required
                       />
                     </div>
-
                     {!editMode && (
                       <>
                         <div>
-                          <label htmlFor="senha" className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor="senha" className="block text-sm font-medium text-gray-900 mb-1">
                             Senha
                           </label>
                           <input
@@ -393,14 +391,13 @@ export default function UsuariosPage() {
                             name="senha"
                             value={userFormData.senha}
                             onChange={handleUserInputChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                            required={!editMode}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            required
                             minLength={6}
                           />
                         </div>
-
                         <div>
-                          <label htmlFor="confirmarSenha" className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor="confirmarSenha" className="block text-sm font-medium text-gray-900 mb-1">
                             Confirmar Senha
                           </label>
                           <input
@@ -409,15 +406,14 @@ export default function UsuariosPage() {
                             name="confirmarSenha"
                             value={userFormData.confirmarSenha}
                             onChange={handleUserInputChange}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                            required={!editMode}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            required
                           />
                         </div>
                       </>
                     )}
-
                     <div>
-                      <label htmlFor="nivel_acesso" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="nivel_acesso" className="block text-sm font-medium text-gray-900 mb-1">
                         Nível de Acesso
                       </label>
                       <select
@@ -425,7 +421,7 @@ export default function UsuariosPage() {
                         name="nivel_acesso"
                         value={userFormData.nivel_acesso}
                         onChange={handleUserInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                         required
                       >
                         <option value="cliente">Cliente</option>
@@ -433,9 +429,8 @@ export default function UsuariosPage() {
                         <option value="admin">Administrador</option>
                       </select>
                     </div>
-
                     <div>
-                      <label htmlFor="loja_id" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="loja_id" className="block text-sm font-medium text-gray-900 mb-1">
                         Loja Associada (Opcional)
                       </label>
                       <select
@@ -443,7 +438,7 @@ export default function UsuariosPage() {
                         name="loja_id"
                         value={userFormData.loja_id}
                         onChange={handleUserInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
                         <option value="">Selecione uma loja</option>
                         {lojas.map((loja) => (
@@ -453,12 +448,11 @@ export default function UsuariosPage() {
                         ))}
                       </select>
                     </div>
-
                     <div className="flex justify-end space-x-3 pt-4">
                       <button
                         type="button"
                         onClick={() => setModalOpen(false)}
-                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
                         Cancelar
                       </button>
@@ -471,16 +465,15 @@ export default function UsuariosPage() {
                     </div>
                   </div>
                 </form>
-              </>
+              </div>
             )}
-
             {modalType === 'loja' && (
-              <>
+              <div className="relative z-60 bg-white opacity-100">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Criar Nova Loja</h2>
                 <form onSubmit={handleLojaSubmit}>
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="nome" className="block text-sm font-medium text-gray-900 mb-1">
                         Nome da Loja
                       </label>
                       <input
@@ -489,13 +482,12 @@ export default function UsuariosPage() {
                         name="nome"
                         value={lojaFormData.nome}
                         onChange={handleLojaInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                         required
                       />
                     </div>
-
                     <div>
-                      <label htmlFor="endereco" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="endereco" className="block text-sm font-medium text-gray-900 mb-1">
                         Endereço
                       </label>
                       <input
@@ -504,16 +496,15 @@ export default function UsuariosPage() {
                         name="endereco"
                         value={lojaFormData.endereco}
                         onChange={handleLojaInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                         required
                       />
                     </div>
-
                     <div className="flex justify-end space-x-3 pt-4">
                       <button
                         type="button"
                         onClick={() => setModalOpen(false)}
-                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
                       >
                         Cancelar
                       </button>
@@ -526,7 +517,7 @@ export default function UsuariosPage() {
                     </div>
                   </div>
                 </form>
-              </>
+              </div>
             )}
           </Modal>
         )}

@@ -1,11 +1,11 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { FiPackage, FiArrowLeft, FiDownload, FiPrinter, FiX } from 'react-icons/fi';
+import { FiPlus, FiArrowLeft, FiDownload, FiPrinter, FiX } from 'react-icons/fi';
 import AuthGuard from '@/components/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
+import Link from 'next/link';
 
 interface Loja {
   id: number;
@@ -47,19 +47,15 @@ export default function NovoPedidoPage() {
     const fetchLojas = async () => {
       try {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        console.log('Token:', token);
         if (!token) throw new Error('Token não encontrado');
         const response = await fetch('http://localhost:5000/api/lojas', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || `Erro ao buscar lojas (Status: ${response.status})`);
         }
         const data = await response.json();
-        console.log('Lojas recebidas:', data);
         setLojas(data);
       } catch (err) {
         console.error('Erro ao carregar lojas:', err);
@@ -72,14 +68,16 @@ export default function NovoPedidoPage() {
   // Buscar endereço pelo CEP
   const handleCepChange = async (cep: string) => {
     setFormData({ ...formData, cep });
+    setError(null);
+    setEndereco(null);
+
     if (cep.length === 8) {
       setIsCepLoading(true);
       try {
         const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
         const data = await response.json();
         if (data.erro) {
-          setError('CEP inválido');
-          setEndereco(null);
+          setError('CEP inválido ou não encontrado.');
         } else {
           setEndereco({
             cep: data.cep,
@@ -89,25 +87,67 @@ export default function NovoPedidoPage() {
             uf: data.uf,
             complemento: data.complemento || '',
           });
-          setError(null);
         }
       } catch (err) {
-        setError('Erro ao buscar endereço');
-        setEndereco(null);
+        setError('Erro ao buscar endereço.');
       } finally {
         setIsCepLoading(false);
       }
+    } else {
+      setError('CEP incompleto. Digite 8 dígitos.');
     }
   };
 
   // Manipular mudanças nos campos
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+    setError(null); // Limpa erros ao alterar campos
   };
 
+  // Verifica se o formulário é válido
+  const isFormValid = () => {
+    const { lojaId, cep, numero, destinatario, peso, dimensoes, valor } = formData;
+  
+    // Verifica se todos os campos obrigatórios estão preenchidos
+    if (!lojaId) {
+      setError('Selecione uma loja de origem.');
+      return false;
+    }
+  
+    if (!cep || cep.length !== 8 || !endereco) {
+      setError('CEP inválido ou incompleto.');
+      return false;
+    }
+  
+    if (!numero) {
+      setError('O número do endereço é obrigatório.');
+      return false;
+    }
+  
+    if (!destinatario) {
+      setError('O destinatário é obrigatório.');
+      return false;
+    }
+  
+    if (!peso) {
+      setError('Selecione o peso do pedido.');
+      return false;
+    }
+  
+    if (!dimensoes) {
+      setError('Selecione as dimensões do pedido.');
+      return false;
+    }
+  
+    if (!valor || parseFloat(valor) <= 0) {
+      setError('O valor deve ser maior que zero.');
+      return false;
+    }
+  
+    setError(null); // Limpa erros se tudo estiver correto
+    return true;
+  };
   // Função para baixar o PDF
   const handleDownload = () => {
     if (pdfUrl) {
@@ -134,6 +174,11 @@ export default function NovoPedidoPage() {
   // Criar pedido e gerar etiqueta
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isFormValid()) {
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -169,6 +214,7 @@ export default function NovoPedidoPage() {
         const errorData = await pedidoResponse.json();
         throw new Error(errorData.error || 'Erro ao criar pedido');
       }
+
       const { id: pedidoId } = await pedidoResponse.json();
 
       // Gerar etiqueta
@@ -187,14 +233,10 @@ export default function NovoPedidoPage() {
       }
 
       const { pdf: pdfBase64 } = await etiquetaResponse.json();
-
-      // Criar URL do PDF a partir do Base64
       const pdfBlob = await (await fetch(`data:application/pdf;base64,${pdfBase64}`)).blob();
       const pdfUrl = URL.createObjectURL(pdfBlob);
       setPdfUrl(pdfUrl);
       setShowModal(true);
-
-      // Redirecionar para o dashboard após fechar o modal
     } catch (err) {
       console.error('Erro ao processar pedido:', err);
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
@@ -213,22 +255,21 @@ export default function NovoPedidoPage() {
         {/* Header */}
         <header className="bg-orange-600 text-white shadow-lg">
           <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <motion.div
-              initial={{ x: -20 }}
-              animate={{ x: 0 }}
-              className="flex items-center gap-2"
-            >
-              <FiPackage className="text-orange-100" />
-              <h1 className="text-2xl font-bold">Novo Pedido</h1>
-            </motion.div>
-            {/* Botão Voltar ao Dashboard */}
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="flex items-center gap-2 text-orange-100 hover:text-white transition"
-            >
-              <FiArrowLeft />
-              Voltar ao Dashboard
-            </button>
+            <div className="flex items-center space-x-4">
+              <Link href="/dashboard" className="hover:bg-orange-700 p-2 rounded-full transition">
+                <FiArrowLeft className="text-xl" />
+              </Link>
+              <h1 className="text-xl font-bold">Novo Pedido</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Link
+                href="/dashboard/pedidos/novo"
+                className="flex items-center space-x-2 bg-white text-orange-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition"
+              >
+                <FiPlus />
+                <span>Novo Pedido</span>
+              </Link>
+            </div>
           </div>
         </header>
 
@@ -240,7 +281,6 @@ export default function NovoPedidoPage() {
             className="bg-white p-8 rounded-xl shadow-lg border border-gray-100"
           >
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Criar Novo Pedido</h2>
-
             {error && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -250,7 +290,6 @@ export default function NovoPedidoPage() {
                 <p className="text-sm text-red-700">{error}</p>
               </motion.div>
             )}
-
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label htmlFor="lojaId" className="block text-sm font-medium text-gray-700">
@@ -272,7 +311,6 @@ export default function NovoPedidoPage() {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label htmlFor="cep" className="block text-sm font-medium text-gray-700">
                   CEP
@@ -296,7 +334,6 @@ export default function NovoPedidoPage() {
                   </p>
                 )}
               </div>
-
               <div>
                 <label htmlFor="numero" className="block text-sm font-medium text-gray-700">
                   Número
@@ -311,7 +348,6 @@ export default function NovoPedidoPage() {
                   required
                 />
               </div>
-
               <div>
                 <label htmlFor="complemento" className="block text-sm font-medium text-gray-700">
                   Complemento (opcional)
@@ -325,7 +361,6 @@ export default function NovoPedidoPage() {
                   className="mt-1 block w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-black placeholder-gray-500 transition-all outline-none"
                 />
               </div>
-
               <div>
                 <label htmlFor="destinatario" className="block text-sm font-medium text-gray-700">
                   Destinatário
@@ -340,7 +375,6 @@ export default function NovoPedidoPage() {
                   required
                 />
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label htmlFor="peso" className="block text-sm font-medium text-gray-700">
@@ -362,7 +396,6 @@ export default function NovoPedidoPage() {
                     <option value="10">10 kg</option>
                   </select>
                 </div>
-
                 <div>
                   <label htmlFor="dimensoes" className="block text-sm font-medium text-gray-700">
                     Dimensões (cm)
@@ -382,7 +415,6 @@ export default function NovoPedidoPage() {
                     <option value="50x40x20">50x40x20 cm</option>
                   </select>
                 </div>
-
                 <div>
                   <label htmlFor="valor" className="block text-sm font-medium text-gray-700">
                     Valor (R$)
@@ -399,7 +431,6 @@ export default function NovoPedidoPage() {
                   />
                 </div>
               </div>
-
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -407,9 +438,9 @@ export default function NovoPedidoPage() {
               >
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !formData.cep || !endereco}
                   className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all ${
-                    isLoading ? 'opacity-75' : ''
+                    isLoading || !formData.cep || !endereco ? 'opacity-75 cursor-not-allowed' : ''
                   }`}
                 >
                   {isLoading ? (
@@ -455,7 +486,13 @@ export default function NovoPedidoPage() {
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-gray-900">Etiqueta de Envio</h3>
-                <button onClick={() => { setShowModal(false); router.push('/dashboard'); }} className="text-gray-500 hover:text-gray-700">
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    router.push('/dashboard');
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
                   <FiX size={24} />
                 </button>
               </div>

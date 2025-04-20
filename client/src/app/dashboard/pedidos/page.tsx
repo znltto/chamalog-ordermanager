@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import AuthGuard from '@/components/AuthGuard';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { FiUser, FiPlus, FiEdit2, FiTrash2, FiArrowLeft } from 'react-icons/fi';
 import { getPedidos, updatePedidoStatus, deletePedido } from '@/services/api';
 
 export default function PedidosPage() {
@@ -105,38 +106,26 @@ export default function PedidosPage() {
   return (
     <AuthGuard>
       <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <header className="bg-orange-600 text-white shadow">
-          <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-            <Link
-              href="/dashboard"
-              className="flex items-center text-white hover:text-orange-200 transition"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5 mr-2"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm-2.293-2.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Voltar ao Dashboard
-            </Link>
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold">Lista de Pedidos</h1>
-              <Link
-                href="/dashboard/pedidos/novo"
-                className="px-4 py-2 bg-white text-orange-600 rounded hover:bg-orange-50 transition"
-              >
-                Novo Pedido
-              </Link>
-            </div>
-          </div>
-        </header>
+{/* Header */}
+<header className="bg-orange-600 text-white shadow-lg">
+  <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+    <div className="flex items-center space-x-4">
+      <Link href="/dashboard" className="hover:bg-orange-700 p-2 rounded-full transition">
+        <FiArrowLeft className="text-xl" />
+      </Link>
+      <h1 className="text-xl font-bold">Lista de Pedidos</h1>
+    </div>
+    <div className="flex items-center space-x-4">
+      <Link
+        href="/dashboard/pedidos/novo"
+        className="flex items-center space-x-2 bg-white text-orange-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition"
+      >
+        <FiPlus />
+        <span>Novo Pedido</span>
+      </Link>
+    </div>
+  </div>
+</header>
 
         {/* Main Content */}
         <main className="container mx-auto px-4 py-8">
