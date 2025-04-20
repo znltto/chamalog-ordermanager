@@ -210,7 +210,7 @@ export const deleteUsuario = async (id: number): Promise<void> => {
 
 export const createLoja = async (data: { nome: string; endereco: string }) => {
   const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/lojas`, {
+  const response = await fetch(`${API_URL}/lojas`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

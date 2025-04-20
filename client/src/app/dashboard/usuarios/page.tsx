@@ -42,7 +42,7 @@ export default function UsuariosPage() {
   });
   const [lojaFormData, setLojaFormData] = useState({
     nome: '',
-    cep: '',  // Novo campo
+    cep: '',
     endereco: '',
   });
 
@@ -60,9 +60,9 @@ export default function UsuariosPage() {
       return '';
     }
   };
-  
+
   const handleCepBlur = async () => {
-    const cep = lojaFormData.cep.replace(/\D/g, ''); // Remove não-dígitos
+    const cep = lojaFormData.cep.replace(/\D/g, '');
     if (cep.length === 8) {
       const address = await fetchAddressFromCep(cep);
       setLojaFormData(prev => ({ ...prev, endereco: address }));
@@ -80,7 +80,6 @@ export default function UsuariosPage() {
       setLoading(true);
       const usuariosData = await getUsuarios();
       setUsuarios(usuariosData);
-
       const lojasData = await getLojas();
       setLojas(lojasData);
     } catch (err) {
@@ -109,12 +108,10 @@ export default function UsuariosPage() {
 
   const handleUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (userFormData.senha !== userFormData.confirmarSenha) {
       toast.error('As senhas não coincidem');
       return;
     }
-
     try {
       if (editMode && currentUsuario?.id) {
         await updateUsuario(currentUsuario.id, {
@@ -134,7 +131,6 @@ export default function UsuariosPage() {
         });
         toast.success('Usuário criado com sucesso');
       }
-
       setModalOpen(false);
       fetchData();
       resetUserForm();
@@ -146,7 +142,8 @@ export default function UsuariosPage() {
 
   const handleLojaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    console.log('Token:', localStorage.getItem('token'));
+    console.log('Dados enviados:', { nome: lojaFormData.nome, endereco: lojaFormData.endereco });
     try {
       await createLoja({
         nome: lojaFormData.nome,
@@ -206,7 +203,7 @@ export default function UsuariosPage() {
   const resetLojaForm = () => {
     setLojaFormData({
       nome: '',
-      cep: '',  // Novo campo
+      cep: '',
       endereco: '',
     });
   };
@@ -495,72 +492,72 @@ export default function UsuariosPage() {
               </div>
             )}
             {modalType === 'loja' && (
-  <div className="relative z-60 bg-white opacity-100">
-    <h2 className="text-xl font-bold text-gray-900 mb-4">Criar Nova Loja</h2>
-    <form onSubmit={handleLojaSubmit}>
-      <div className="space-y-4">
-        <div>
-          <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
-            Nome da Loja
-          </label>
-          <input
-            type="text"
-            id="nome"
-            name="nome"
-            value={lojaFormData.nome}
-            onChange={handleLojaInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="cep" className="block text-sm font-medium text-gray-700 mb-1">
-            CEP
-          </label>
-          <input
-            type="text"
-            id="cep"
-            name="cep"
-            value={lojaFormData.cep}
-            onChange={handleLojaInputChange}
-            onBlur={handleCepBlur}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-            required
-          />
-        </div>
-        <div>
-          <label htmlFor="endereco" className="block text-sm font-medium text-gray-700 mb-1">
-            Endereço
-          </label>
-          <input
-            type="text"
-            id="endereco"
-            name="endereco"
-            value={lojaFormData.endereco}
-            onChange={handleLojaInputChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-            required
-          />
-        </div>
-        <div className="flex justify-end space-x-3 pt-4">
-          <button
-            type="button"
-            onClick={() => setModalOpen(false)}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
-          >
-            Criar
-          </button>
-        </div>
-      </div>
-    </form>
-  </div>
-)}
+              <div className="relative z-60 bg-white opacity-100">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Criar Nova Loja</h2>
+                <form onSubmit={handleLojaSubmit}>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="nome" className="block text-sm font-medium text-gray-900 mb-1">
+                        Nome da Loja
+                      </label>
+                      <input
+                        type="text"
+                        id="nome"
+                        name="nome"
+                        value={lojaFormData.nome}
+                        onChange={handleLojaInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="cep" className="block text-sm font-medium text-gray-900 mb-1">
+                        CEP
+                      </label>
+                      <input
+                        type="text"
+                        id="cep"
+                        name="cep"
+                        value={lojaFormData.cep}
+                        onChange={handleLojaInputChange}
+                        onBlur={handleCepBlur}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="endereco" className="block text-sm font-medium text-gray-900 mb-1">
+                        Endereço
+                      </label>
+                      <input
+                        type="text"
+                        id="endereco"
+                        name="endereco"
+                        value={lojaFormData.endereco}
+                        onChange={handleLojaInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        required
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setModalOpen(false)}
+                        className="px-4 py-2 border border-gray-300 rounded-md text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      >
+                        Criar
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
           </Modal>
         )}
       </motion.div>
