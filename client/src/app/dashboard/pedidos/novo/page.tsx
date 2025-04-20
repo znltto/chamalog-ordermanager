@@ -6,6 +6,7 @@ import { FiPlus, FiArrowLeft, FiDownload, FiPrinter, FiX } from 'react-icons/fi'
 import AuthGuard from '@/components/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
+import {getLojas } from '@/services/api';
 
 interface Loja {
   id: number;
@@ -46,16 +47,20 @@ export default function NovoPedidoPage() {
   useEffect(() => {
     const fetchLojas = async () => {
       try {
-        const lojasData = await getLojas();
-        // Se for cliente e não tiver lojas, mostrar mensagem
-        if (user?.nivel_acesso === 'cliente' && lojasData.length === 0) {
-          setError('Você não tem uma loja associada. Contate o administrador.');
-        } else {
-          setLojas(lojasData);
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) throw new Error('Token não encontrado');
+        const response = await fetch('http://localhost:5000/api/lojas', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Erro ao buscar lojas (Status: ${response.status})`);
         }
+        const data = await response.json();
+        setLojas(data);
       } catch (err) {
         console.error('Erro ao carregar lojas:', err);
-        setError('Erro ao carregar lojas');
+        setError('Erro ao carregar lojas: ' + err);
       }
     };
     fetchLojas();
