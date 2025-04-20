@@ -262,13 +262,6 @@ export default function NovoPedidoPage() {
               <h1 className="text-xl font-bold">Novo Pedido</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <Link
-                href="/dashboard/pedidos/novo"
-                className="flex items-center space-x-2 bg-white text-orange-600 px-4 py-2 rounded-lg hover:bg-gray-100 transition"
-              >
-                <FiPlus />
-                <span>Novo Pedido</span>
-              </Link>
             </div>
           </div>
         </header>

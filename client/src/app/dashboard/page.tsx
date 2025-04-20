@@ -4,10 +4,48 @@ import AuthGuard from '@/components/AuthGuard';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { FiPackage, FiTruck, FiCheckCircle, FiUser, FiPlus, FiList, FiUsers } from 'react-icons/fi';
+import { FiPackage, FiTruck, FiCheckCircle, FiUser, FiPlus, FiList, FiUsers, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import LogoutButton from '@/components/LogoutButton';
 import { useEffect, useState } from 'react';
 import { getPedidoEstatisticas, getAtividadesRecentes } from '@/services/api';
+
+const CountUpAnimation = ({
+  endValue,
+  duration = 2,
+  suffix = '',
+  className = '',
+}: {
+  endValue: number;
+  duration?: number;
+  suffix?: string;
+  className?: string;
+}) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const increment = endValue / (duration * 60); // 60fps
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= endValue) {
+        setCount(endValue);
+        clearInterval(timer);
+      } else {
+        setCount(Math.floor(start));
+      }
+    }, 1000 / 60); // 60fps
+
+    return () => clearInterval(timer);
+  }, [endValue, duration]);
+
+  return (
+    <span className={className}>
+      {count.toLocaleString()}
+      {suffix}
+    </span>
+  );
+};
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -19,6 +57,13 @@ export default function DashboardPage() {
   const [atividades, setAtividades] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Estado para controlar se a animação já foi executada
+  const [hasAnimated, setHasAnimated] = useState(false);
+
+  // Estados para paginação
+  const [currentPage, setCurrentPage] = useState(0);
+  const itemsPerPage = 3;
+  const totalPages = Math.ceil(atividades.length / itemsPerPage);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,7 +84,30 @@ export default function DashboardPage() {
     };
 
     fetchData();
+
+    // Configurar um temporizador para marcar a animação como concluída após a duração
+    const animationTimer = setTimeout(() => {
+      setHasAnimated(true);
+    }, 2000); // 2000ms = 2s, correspondendo à duração padrão da animação
+
+    return () => clearTimeout(animationTimer);
   }, []);
+
+  // Função para avançar página
+  const nextPage = () => {
+    setCurrentPage((prev) => (prev < totalPages - 1 ? prev + 1 : prev));
+  };
+
+  // Função para voltar página
+  const prevPage = () => {
+    setCurrentPage((prev) => (prev > 0 ? prev - 1 : prev));
+  };
+
+  // Obter atividades para a página atual
+  const paginatedAtividades = atividades.slice(
+    currentPage * itemsPerPage,
+    (currentPage + 1) * itemsPerPage
+  );
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -229,18 +297,42 @@ export default function DashboardPage() {
                 ) : error ? (
                   <p className="text-red-500">{error}</p>
                 ) : atividades.length > 0 ? (
-                  atividades.map((atividade, index) => (
-                    <motion.div
-                      key={atividade.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="border-b border-gray-100 pb-3 last:border-0"
-                    >
-                      <p className="text-sm font-medium text-gray-800">{atividade.action}</p>
-                      <p className="text-xs text-gray-600">{atividade.time}</p>
-                    </motion.div>
-                  ))
+                  <>
+                    {paginatedAtividades.map((atividade, index) => (
+                      <motion.div
+                        key={atividade.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="border-b border-gray-100 pb-3 last:border-0"
+                      >
+                        <p className="text-sm font-medium text-gray-800">{atividade.action}</p>
+                        <p className="text-xs text-gray-600">{atividade.time}</p>
+                      </motion.div>
+                    ))}
+                    {/* Controles de paginação */}
+                    {totalPages > 1 && (
+                      <div className="flex justify-between items-center pt-2">
+                        <button
+                          onClick={prevPage}
+                          disabled={currentPage === 0}
+                          className={`p-2 rounded-full ${currentPage === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          <FiChevronLeft />
+                        </button>
+                        <span className="text-sm text-gray-600">
+                          Página {currentPage + 1} de {totalPages}
+                        </span>
+                        <button
+                          onClick={nextPage}
+                          disabled={currentPage === totalPages - 1}
+                          className={`p-2 rounded-full ${currentPage === totalPages - 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}`}
+                        >
+                          <FiChevronRight />
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <p className="text-gray-700">Nenhuma atividade encontrada.</p>
                 )}
@@ -248,18 +340,90 @@ export default function DashboardPage() {
             </motion.div>
           </div>
 
-          {/* Bloco de Bem-Vindo */}
+          {/* Bloco de Bem-Vindo Modernizado com Estatísticas */}
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="mt-8 bg-white p-6 rounded-xl shadow-lg border border-gray-100"
+            className="mt-8 bg-white p-6 rounded-xl shadow-lg border border-gray-100 relative"
           >
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Bem-vindo ao Painel ChamaLog</h2>
-            <p className="text-gray-700">
-              Aqui você pode gerenciar todos os pedidos, acompanhar entregas e muito mais. Comece
-              criando um novo pedido ou visualizando os existentes.
-            </p>
+            <div className="relative z-10">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Bem-vindo ao <span className="text-orange-500">Painel ChamaLog</span>
+              </h2>
+              <p className="text-gray-700 mb-6 max-w-lg">
+                Aqui você pode gerenciar todos os pedidos, acompanhar entregas e monitorar o desempenho da sua operação.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {/* Estatística 1 - Faturamento */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-500"
+                >
+                  <p className="text-sm text-gray-600 mb-1">Faturamento Mensal</p>
+                  {hasAnimated ? (
+                    <span className="text-2xl font-bold text-orange-600">
+                      {(28460).toLocaleString()}
+                    </span>
+                  ) : (
+                    <CountUpAnimation
+                      endValue={28460}
+                      className="text-2xl font-bold text-orange-600"
+                    />
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">+12% em relação ao mês passado</p>
+                </motion.div>
+
+                {/* Estatística 2 - Pedidos Ativos */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500"
+                >
+                  <p className="text-sm text-gray-600 mb-1">Pedidos Ativos</p>
+                  {hasAnimated ? (
+                    <span className="text-2xl font-bold text-blue-600">
+                      {(47).toLocaleString()}
+                    </span>
+                  ) : (
+                    <CountUpAnimation
+                      endValue={47}
+                      className="text-2xl font-bold text-blue-600"
+                    />
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">5 novos hoje</p>
+                </motion.div>
+
+                {/* Estatística 3 - Satisfação */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                  className="bg-green-50 p-4 rounded-lg border-l-4 border-green-500"
+                >
+                  <p className="text-sm text-gray-600 mb-1">Satisfação</p>
+                  {hasAnimated ? (
+                    <span className="text-2xl font-bold text-green-600">
+                      {(94).toLocaleString()}%
+                    </span>
+                  ) : (
+                    <CountUpAnimation
+                      endValue={94}
+                      suffix="%"
+                      className="text-2xl font-bold text-green-600"
+                    />
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">Média de avaliações</p>
+                </motion.div>
+              </div>
+              <div className="mt-4 flex items-center gap-2 text-sm text-orange-600">
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                <span>Sistema online e operacional</span>
+              </div>
+            </div>
           </motion.div>
         </motion.main>
       </motion.div>

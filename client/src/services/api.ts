@@ -208,6 +208,20 @@ export const deleteUsuario = async (id: number): Promise<void> => {
   }
 };
 
+export const deleteLoja = async (id: number) => {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`/api/lojas/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!response.ok) {
+    throw new Error('Erro ao excluir loja');
+  }
+};
+
 export const createLoja = async (data: { nome: string; endereco: string }) => {
   const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
   const response = await fetch(`${API_URL}/lojas`, {

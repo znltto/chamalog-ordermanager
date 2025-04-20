@@ -2,10 +2,10 @@
 import { useAuth } from '@/hooks/useAuth';
 import AuthGuard from '@/components/AuthGuard';
 import { useEffect, useState } from 'react';
-import { FiUser, FiPlus, FiEdit2, FiTrash2, FiArrowLeft } from 'react-icons/fi';
+import { FiUser, FiPlus, FiEdit2, FiTrash2, FiArrowLeft, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { getUsuarios, createUsuario, updateUsuario, deleteUsuario, getLojas, createLoja } from '@/services/api';
+import { getUsuarios, createUsuario, updateUsuario, deleteUsuario, getLojas, createLoja, deleteLoja } from '@/services/api';
 import { toast } from 'react-toastify';
 import Modal from '@/components/Modal';
 
@@ -20,6 +20,7 @@ interface Usuario {
 interface Loja {
   id: number;
   nome: string;
+  endereco: string;
 }
 
 export default function UsuariosPage() {
@@ -45,6 +46,20 @@ export default function UsuariosPage() {
     cep: '',
     endereco: '',
   });
+
+  // Pagination states for users
+  const [userPage, setUserPage] = useState(0);
+  const usersPerPage = 5;
+  const totalUserPages = Math.ceil(usuarios.length / usersPerPage);
+
+  // Pagination states for stores
+  const [lojaPage, setLojaPage] = useState(0);
+  const lojasPerPage = 5;
+  const totalLojaPages = Math.ceil(lojas.length / lojasPerPage);
+
+  // Selection states
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [selectedLojas, setSelectedLojas] = useState<number[]>([]);
 
   const fetchAddressFromCep = async (cep: string) => {
     try {
@@ -142,8 +157,6 @@ export default function UsuariosPage() {
 
   const handleLojaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Token:', localStorage.getItem('token'));
-    console.log('Dados enviados:', { nome: lojaFormData.nome, endereco: lojaFormData.endereco });
     try {
       await createLoja({
         nome: lojaFormData.nome,
@@ -174,16 +187,95 @@ export default function UsuariosPage() {
     setModalOpen(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDeleteUser = async (id: number) => {
     if (window.confirm('Tem certeza que deseja excluir este usuário?')) {
       try {
         await deleteUsuario(id);
         toast.success('Usuário excluído com sucesso');
         fetchData();
+        setSelectedUsers(prev => prev.filter(userId => userId !== id));
       } catch (error) {
         console.error('Erro ao excluir usuário:', error);
         toast.error('Erro ao excluir usuário');
       }
+    }
+  };
+
+  const handleDeleteLoja = async (id: number) => {
+    if (window.confirm('Tem certeza que deseja excluir esta loja?')) {
+      try {
+        await deleteLoja(id);
+        toast.success('Loja excluída com sucesso');
+        fetchData();
+        setSelectedLojas(prev => prev.filter(lojaId => lojaId !== id));
+      } catch (error) {
+        console.error('Erro ao excluir loja:', error);
+        toast.error('Erro ao excluir loja');
+      }
+    }
+  };
+
+  const handleBulkDeleteUsers = async () => {
+    if (selectedUsers.length === 0) {
+      toast.error('Nenhum usuário selecionado');
+      return;
+    }
+    if (window.confirm(`Tem certeza que deseja excluir ${selectedUsers.length} usuário(s)?`)) {
+      try {
+        await Promise.all(selectedUsers.map(id => deleteUsuario(id)));
+        toast.success('Usuários excluídos com sucesso');
+        fetchData();
+        setSelectedUsers([]);
+      } catch (error) {
+        console.error('Erro ao excluir usuários:', error);
+        toast.error('Erro ao excluir usuários');
+      }
+    }
+  };
+
+  const handleBulkDeleteLojas = async () => {
+    if (selectedLojas.length === 0) {
+      toast.error('Nenhuma loja selecionada');
+      return;
+    }
+    if (window.confirm(`Tem certeza que deseja excluir ${selectedLojas.length} loja(s)?`)) {
+      try {
+        await Promise.all(selectedLojas.map(id => deleteLoja(id)));
+        toast.success('Lojas excluídas com sucesso');
+        fetchData();
+        setSelectedLojas([]);
+      } catch (error) {
+        console.error('Erro ao excluir lojas:', error);
+        toast.error('Erro ao excluir lojas');
+      }
+    }
+  };
+
+  const handleSelectUser = (id: number) => {
+    setSelectedUsers(prev =>
+      prev.includes(id) ? prev.filter(userId => userId !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectLoja = (id: number) => {
+    setSelectedLojas(prev =>
+      prev.includes(id) ? prev.filter(lojaId => lojaId !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllUsers = () => {
+    if (selectedUsers.length === usuarios.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(usuarios.map(user => user.id));
+    }
+  };
+
+  const handleSelectAllLojas = () => {
+    if (selectedLojas.length === lojas.length) {
+      setSelectedLojas([]);
+    } else {
+      setSelectedLojas(lojas.map(loja => loja.id));
     }
   };
 
@@ -246,6 +338,30 @@ export default function UsuariosPage() {
     }
   };
 
+  // Pagination for users
+  const paginatedUsuarios = usuarios.slice(userPage * usersPerPage, (userPage + 1) * usersPerPage);
+
+  // Pagination for stores
+  const paginatedLojas = lojas.slice(lojaPage * lojasPerPage, (lojaPage + 1) * lojasPerPage);
+
+  // Generate page numbers for pagination
+  const getPageNumbers = (totalPages: number, currentPage: number) => {
+    const maxPagesToShow = 5;
+    const pages = [];
+    let startPage = Math.max(0, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages - 1, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage + 1 < maxPagesToShow) {
+      startPage = Math.max(0, endPage - maxPagesToShow + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+
+    return pages;
+  };
+
   return (
     <AuthGuard requiredLevel="admin">
       <motion.div
@@ -260,7 +376,7 @@ export default function UsuariosPage() {
               <Link href="/dashboard" className="hover:bg-orange-700 p-2 rounded-full transition">
                 <FiArrowLeft className="text-xl" />
               </Link>
-              <h1 className="text-xl font-bold">Gerenciamento de Usuários</h1>
+              <h1 className="text-xl font-bold">Gerenciamento de Usuários e Lojas</h1>
             </div>
             {user?.nivel_acesso === 'admin' && (
               <div className="flex items-center space-x-4">
@@ -284,43 +400,70 @@ export default function UsuariosPage() {
         </header>
 
         {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 py-8">
+        <main className="max-w-7xl mx-auto px-4 py-8 space-y-8">
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
               {error}
             </div>
           )}
 
+          {/* Usuários Section */}
           <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="p-6 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-900">Usuários</h2>
+              {selectedUsers.length > 0 && (
+                <button
+                  onClick={handleBulkDeleteUsers}
+                  className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
+                >
+                  <FiTrash2 />
+                  <span>Excluir Selecionados ({selectedUsers.length})</span>
+                </button>
+              )}
+            </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.length === usuarios.length && usuarios.length > 0}
+                        onChange={handleSelectAllUsers}
+                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                      />
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nível de Acesso</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data de Criação</th>
-                    {user?.nivel_acesso === 'admin' && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                    )}
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {loading ? (
                     <tr>
-                      <td colSpan={user?.nivel_acesso === 'admin' ? 5 : 4} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                         Carregando usuários...
                       </td>
                     </tr>
-                  ) : usuarios.length === 0 ? (
+                  ) : paginatedUsuarios.length === 0 ? (
                     <tr>
-                      <td colSpan={user?.nivel_acesso === 'admin' ? 5 : 4} className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                         Nenhum usuário encontrado
                       </td>
                     </tr>
                   ) : (
-                    usuarios.map((usuario) => (
+                    paginatedUsuarios.map((usuario) => (
                       <tr key={usuario.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedUsers.includes(usuario.id)}
+                            onChange={() => handleSelectUser(usuario.id)}
+                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                          />
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10 bg-orange-100 rounded-full flex items-center justify-center">
@@ -340,28 +483,179 @@ export default function UsuariosPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(usuario.criado_em).toLocaleDateString('pt-BR')}
                         </td>
-                        {user?.nivel_acesso === 'admin' && (
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button
-                              onClick={() => handleEdit(usuario)}
-                              className="text-orange-600 hover:text-orange-900 mr-4"
-                            >
-                              <FiEdit2 className="inline" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(usuario.id)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              <FiTrash2 className="inline" />
-                            </button>
-                          </td>
-                        )}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => handleEdit(usuario)}
+                            className="text-orange-600 hover:text-orange-900 mr-4"
+                          >
+                            <FiEdit2 className="inline" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(usuario.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <FiTrash2 className="inline" />
+                          </button>
+                        </td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
             </div>
+            {/* Pagination for Users */}
+            {totalUserPages > 1 && (
+              <div className="flex justify-between items-center p-4">
+                <button
+                  onClick={() => setUserPage(prev => Math.max(prev - 1, 0))}
+                  disabled={userPage === 0}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+                    userPage === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <FiChevronLeft />
+                  <span>Anterior</span>
+                </button>
+                <div className="flex space-x-2">
+                  {getPageNumbers(totalUserPages, userPage).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setUserPage(page)}
+                      className={`px-3 py-1 rounded-md ${
+                        userPage === page
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {page + 1}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setUserPage(prev => Math.min(prev + 1, totalUserPages - 1))}
+                  disabled={userPage === totalUserPages - 1}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+                    userPage === totalUserPages - 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <span>Próximo</span>
+                  <FiChevronRight />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Lojas Section */}
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="p-6 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-gray-900">Lojas</h2>
+              {selectedLojas.length > 0 && (
+                <button
+                  onClick={handleBulkDeleteLojas}
+                  className="flex items-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition"
+                >
+                  <FiTrash2 />
+                  <span>Excluir Selecionados ({selectedLojas.length})</span>
+                </button>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <input
+                        type="checkbox"
+                        checked={selectedLojas.length === lojas.length && lojas.length > 0}
+                        onChange={handleSelectAllLojas}
+                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                      />
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Endereço</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                        Carregando lojas...
+                      </td>
+                    </tr>
+                  ) : paginatedLojas.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                        Nenhuma loja encontrada
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedLojas.map((loja) => (
+                      <tr key={loja.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedLojas.includes(loja.id)}
+                            onChange={() => handleSelectLoja(loja.id)}
+                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{loja.nome}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{loja.endereco}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => handleDeleteLoja(loja.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <FiTrash2 className="inline" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {/* Pagination for Lojas */}
+            {totalLojaPages > 1 && (
+              <div className="flex justify-between items-center p-4">
+                <button
+                  onClick={() => setLojaPage(prev => Math.max(prev - 1, 0))}
+                  disabled={lojaPage === 0}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+                    lojaPage === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <FiChevronLeft />
+                  <span>Anterior</span>
+                </button>
+                <div className="flex space-x-2">
+                  {getPageNumbers(totalLojaPages, lojaPage).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setLojaPage(page)}
+                      className={`px-3 py-1 rounded-md ${
+                        lojaPage === page
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {page + 1}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setLojaPage(prev => Math.min(prev + 1, totalLojaPages - 1))}
+                  disabled={lojaPage === totalLojaPages - 1}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
+                    lojaPage === totalLojaPages - 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <span>Próximo</span>
+                  <FiChevronRight />
+                </button>
+              </div>
+            )}
           </div>
         </main>
 

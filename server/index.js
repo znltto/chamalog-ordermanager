@@ -259,6 +259,30 @@ app.post('/api/lojas', authenticateToken, checkAccessLevel('admin'), async (req,
   }
 });
 
+// Rota para excluir uma loja (apenas admin)
+app.delete('/api/lojas/:id', authenticateToken, checkAccessLevel('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar se a loja existe
+    const [existingLoja] = await pool.query('SELECT * FROM lojas WHERE id = ?', [id]);
+    if (existingLoja.length === 0) {
+      return res.status(404).json({ error: 'Loja não encontrada' });
+    }
+
+    // Excluir loja
+    await pool.query('DELETE FROM lojas WHERE id = ?', [id]);
+
+    // Registrar atividade
+    await registrarAtividade(`Loja excluída: ${existingLoja[0].nome}`, req.user.id);
+
+    res.json({ message: 'Loja excluída com sucesso' });
+  } catch (error) {
+    console.error('Erro ao excluir loja:', error);
+    res.status(500).json({ error: 'Erro interno no servidor' });
+  }
+});
+
 // Rota para gerar etiqueta PDF
 app.post('/api/etiquetas', authenticateToken, async (req, res) => {
   try {
