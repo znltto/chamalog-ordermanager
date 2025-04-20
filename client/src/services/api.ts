@@ -1,5 +1,12 @@
 const API_URL = 'http://localhost:5000/api';
 
+// Interface para a estrutura de uma loja
+interface Loja {
+  id: number;
+  nome: string;
+  endereco: string;
+}
+
 interface LoginResponse {
   user: {
     id: number;
@@ -57,6 +64,7 @@ export const getAtividadesRecentes = async (): Promise<any[]> => {
 // Função para excluir um pedido
 export const deletePedido = async (pedidoId: number): Promise<void> => {
   const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
   const response = await fetch(`${API_URL}/pedidos/${pedidoId}`, {
     method: 'DELETE',
     headers: {
@@ -74,6 +82,7 @@ export const deletePedido = async (pedidoId: number): Promise<void> => {
 // Função para atualizar o status de um pedido
 export const updatePedidoStatus = async (pedidoId: number, status: string): Promise<void> => {
   const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
   const response = await fetch(`${API_URL}/pedidos/${pedidoId}/status`, {
     method: 'PUT',
     headers: {
@@ -92,6 +101,7 @@ export const updatePedidoStatus = async (pedidoId: number, status: string): Prom
 // Função para buscar estatísticas de pedidos
 export const getPedidoEstatisticas = async (): Promise<PedidoEstatisticas> => {
   const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
   const response = await fetch(`${API_URL}/pedido-estatisticas`, {
     method: 'GET',
     headers: {
@@ -120,6 +130,7 @@ interface Pedido {
 // Função para buscar todos os pedidos
 export const getPedidos = async (): Promise<Pedido[]> => {
   const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
   const response = await fetch(`${API_URL}/pedidos`, {
     method: 'GET',
     headers: {
@@ -139,13 +150,17 @@ export const getPedidos = async (): Promise<Pedido[]> => {
 // Funções para gerenciamento de usuários
 export const getUsuarios = async (): Promise<any[]> => {
   const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
   const response = await fetch(`${API_URL}/usuarios`, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
-  if (!response.ok) throw new Error('Erro ao carregar usuários');
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Erro ao carregar usuários');
+  }
   return response.json();
 };
 
@@ -157,6 +172,7 @@ export const createUsuario = async (data: {
   loja_id?: number;
 }): Promise<any> => {
   const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
   const response = await fetch(`${API_URL}/usuarios`, {
     method: 'POST',
     headers: {
@@ -172,13 +188,17 @@ export const createUsuario = async (data: {
   return response.json();
 };
 
-export const updateUsuario = async (id: number, data: {
-  nome: string;
-  email: string;
-  nivel_acesso: 'admin' | 'funcionario' | 'cliente';
-  loja_id?: number;
-}): Promise<any> => {
+export const updateUsuario = async (
+  id: number,
+  data: {
+    nome: string;
+    email: string;
+    nivel_acesso: 'admin' | 'funcionario' | 'cliente';
+    loja_id?: number;
+  }
+): Promise<any> => {
   const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
   const response = await fetch(`${API_URL}/usuarios/${id}`, {
     method: 'PUT',
     headers: {
@@ -196,6 +216,7 @@ export const updateUsuario = async (id: number, data: {
 
 export const deleteUsuario = async (id: number): Promise<void> => {
   const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
   const response = await fetch(`${API_URL}/usuarios/${id}`, {
     method: 'DELETE',
     headers: {
@@ -208,22 +229,10 @@ export const deleteUsuario = async (id: number): Promise<void> => {
   }
 };
 
-export const deleteLoja = async (id: number) => {
+// Funções para gerenciamento de lojas
+export const createLoja = async (data: { nome: string; endereco: string }): Promise<any> => {
   const token = localStorage.getItem('token');
-  const response = await fetch(`/api/lojas/${id}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  if (!response.ok) {
-    throw new Error('Erro ao excluir loja');
-  }
-};
-
-export const createLoja = async (data: { nome: string; endereco: string }) => {
-  const token = localStorage.getItem('token'); // Assuming token is stored in localStorage
+  if (!token) throw new Error('Token de autenticação não encontrado');
   const response = await fetch(`${API_URL}/lojas`, {
     method: 'POST',
     headers: {
@@ -241,13 +250,34 @@ export const createLoja = async (data: { nome: string; endereco: string }) => {
   return response.json();
 };
 
-export const getLojas = async (): Promise<any[]> => {
+export const getLojas = async (): Promise<Loja[]> => {
   const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
   const response = await fetch(`${API_URL}/lojas`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
-  if (!response.ok) throw new Error('Erro ao carregar lojas');
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Erro ao carregar lojas');
+  }
   return response.json();
+};
+
+export const deleteLoja = async (id: number): Promise<void> => {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
+  // Corrigindo a URL para usar API_URL
+  const response = await fetch(`${API_URL}/lojas/${id}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Erro ao excluir loja');
+  }
 };

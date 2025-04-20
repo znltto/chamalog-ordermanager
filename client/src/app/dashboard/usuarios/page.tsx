@@ -42,8 +42,8 @@ export default function UsuariosPage() {
     loja_id: '',
   });
   const [lojaFormData, setLojaFormData] = useState({
-    nome: '',
     cep: '',
+    numero: '',
     endereco: '',
   });
 
@@ -68,21 +68,28 @@ export default function UsuariosPage() {
       if (data.erro) {
         throw new Error('CEP não encontrado');
       }
-      return `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`;
+      return data;
     } catch (error) {
       console.error('Erro ao buscar endereço:', error);
       toast.error('Erro ao buscar endereço');
-      return '';
+      return null;
     }
   };
 
   const handleCepBlur = async () => {
     const cep = lojaFormData.cep.replace(/\D/g, '');
     if (cep.length === 8) {
-      const address = await fetchAddressFromCep(cep);
-      setLojaFormData(prev => ({ ...prev, endereco: address }));
+      const addressData = await fetchAddressFromCep(cep);
+      if (addressData) {
+        const enderecoCompleto = `${addressData.logradouro}, ${addressData.bairro}, ${addressData.localidade} - ${addressData.uf}${lojaFormData.numero ? `, ${lojaFormData.numero}` : ''}`;
+        setLojaFormData(prev => ({
+          ...prev,
+          endereco: enderecoCompleto,
+        }));
+      }
     } else {
       toast.error('CEP inválido');
+      setLojaFormData(prev => ({ ...prev, endereco: '' }));
     }
   };
 
@@ -119,6 +126,18 @@ export default function UsuariosPage() {
       ...prev,
       [name]: value,
     }));
+    // Atualizar endereço se o número mudar
+    if (name === 'numero' && lojaFormData.cep.replace(/\D/g, '').length === 8) {
+      fetchAddressFromCep(lojaFormData.cep.replace(/\D/g, '')).then(addressData => {
+        if (addressData) {
+          const enderecoCompleto = `${addressData.logradouro}, ${addressData.bairro}, ${addressData.localidade} - ${addressData.uf}${value ? `, ${value}` : ''}`;
+          setLojaFormData(prev => ({
+            ...prev,
+            endereco: enderecoCompleto,
+          }));
+        }
+      });
+    }
   };
 
   const handleUserSubmit = async (e: React.FormEvent) => {
@@ -157,9 +176,15 @@ export default function UsuariosPage() {
 
   const handleLojaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!lojaFormData.cep || !lojaFormData.numero || !lojaFormData.endereco) {
+      toast.error('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
     try {
+      // Gerar nome da loja baseado no endereço
+      const nomeLoja = `Loja ${lojaFormData.endereco.split(',')[2]?.trim() || 'Padrão'}`; // Ex.: "Loja São Paulo"
       await createLoja({
-        nome: lojaFormData.nome,
+        nome: nomeLoja,
         endereco: lojaFormData.endereco,
       });
       toast.success('Loja criada com sucesso');
@@ -294,8 +319,8 @@ export default function UsuariosPage() {
 
   const resetLojaForm = () => {
     setLojaFormData({
-      nome: '',
       cep: '',
+      numero: '',
       endereco: '',
     });
   };
@@ -332,7 +357,7 @@ export default function UsuariosPage() {
       case 'funcionario':
         return 'bg-blue-100 text-blue-800';
       case 'cliente':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -791,20 +816,6 @@ export default function UsuariosPage() {
                 <form onSubmit={handleLojaSubmit}>
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="nome" className="block text-sm font-medium text-gray-900 mb-1">
-                        Nome da Loja
-                      </label>
-                      <input
-                        type="text"
-                        id="nome"
-                        name="nome"
-                        value={lojaFormData.nome}
-                        onChange={handleLojaInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        required
-                      />
-                    </div>
-                    <div>
                       <label htmlFor="cep" className="block text-sm font-medium text-gray-900 mb-1">
                         CEP
                       </label>
@@ -817,21 +828,31 @@ export default function UsuariosPage() {
                         onBlur={handleCepBlur}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                         required
+                        placeholder="Digite o CEP (ex.: 12345-678)"
                       />
                     </div>
                     <div>
-                      <label htmlFor="endereco" className="block text-sm font-medium text-gray-900 mb-1">
-                        Endereço
+                      <label htmlFor="numero" className="block text-sm font-medium text-gray-900 mb-1">
+                        Número do Comércio
                       </label>
                       <input
                         type="text"
-                        id="endereco"
-                        name="endereco"
-                        value={lojaFormData.endereco}
+                        id="numero"
+                        name="numero"
+                        value={lojaFormData.numero}
                         onChange={handleLojaInputChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
                         required
+                        placeholder="Ex.: 123 ou s/n"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-1">
+                        Endereço
+                      </label>
+                      <p className="w-full px-3 py-2 bg-gray-100 rounded-md text-gray-900">
+                        {lojaFormData.endereco || 'Aguardando CEP válido...'}
+                      </p>
                     </div>
                     <div className="flex justify-end space-x-3 pt-4">
                       <button

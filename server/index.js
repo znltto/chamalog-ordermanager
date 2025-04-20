@@ -105,12 +105,13 @@ app.get('/api/usuarios', authenticateToken, checkAccessLevel('admin'), async (re
 
 app.post('/api/usuarios', authenticateToken, checkAccessLevel('admin'), async (req, res) => {
   try {
-    const { nome, email, senha, nivel_acesso, loja_id } = req.body;
+    const { nivel_acesso, loja_id } = req.body;
     
-    // Verificar se o usuário já existe
-    const [existingUsers] = await pool.query('SELECT * FROM usuarios WHERE email = ?', [email]);
-    if (existingUsers.length > 0) {
-      return res.status(400).json({ error: 'Email já está em uso' });
+    // Validação: só funcionários podem ter loja associada
+    if (nivel_acesso !== 'funcionario' && loja_id) {
+      return res.status(400).json({ 
+        error: 'Apenas funcionários podem ter loja associada' 
+      });
     }
 
     // Hash da senha
@@ -119,8 +120,8 @@ app.post('/api/usuarios', authenticateToken, checkAccessLevel('admin'), async (r
 
     // Criar usuário
     const [result] = await pool.query(
-      'INSERT INTO usuarios (nome, email, senha_hash, nivel_acesso) VALUES (?, ?, ?, ?)',
-      [nome, email, senha_hash, nivel_acesso]
+      'INSERT INTO usuarios (nome, email, senha_hash, nivel_acesso, loja_id) VALUES (?, ?, ?, ?, ?)',
+      [nome, email, senha_hash, nivel_acesso, loja_id || null]
     );
 
     // Registrar atividade
@@ -188,9 +189,19 @@ app.delete('/api/usuarios/:id', authenticateToken, checkAccessLevel('admin'), as
   }
 });
 
-// Rota para listar lojas (admin e funcionario)
-app.get('/api/lojas', authenticateToken, checkAccessLevel('funcionario'), async (req, res) => {
+// No seu index.js, atualize a rota de lojas para:
+app.get('/api/lojas', authenticateToken, async (req, res) => {
   try {
+    // Clientes só veem sua própria loja (se tiver uma associada)
+    if (req.user.nivel_acesso === 'cliente') {
+      const [loja] = await pool.query(
+        'SELECT id, nome FROM lojas WHERE id = (SELECT loja_id FROM usuarios WHERE id = ?)',
+        [req.user.id]
+      );
+      return res.json(loja);
+    }
+    
+    // Funcionários e admin veem todas as lojas
     const [lojas] = await pool.query('SELECT id, nome FROM lojas');
     res.json(lojas);
   } catch (error) {
