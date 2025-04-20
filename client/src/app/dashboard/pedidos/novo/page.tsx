@@ -6,11 +6,12 @@ import { FiPlus, FiArrowLeft, FiDownload, FiPrinter, FiX } from 'react-icons/fi'
 import AuthGuard from '@/components/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
-import {getLojas } from '@/services/api';
+import { getLojas, createPedido } from '@/services/api'; // Adicionado createPedido
 
 interface Loja {
   id: number;
   nome: string;
+  endereco: string; // Adicionado para alinhar com o backend
 }
 
 interface Endereco {
@@ -47,17 +48,8 @@ export default function NovoPedidoPage() {
   useEffect(() => {
     const fetchLojas = async () => {
       try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (!token) throw new Error('Token não encontrado');
-        const response = await fetch('http://localhost:5000/api/lojas', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Erro ao buscar lojas (Status: ${response.status})`);
-        }
-        const data = await response.json();
-        setLojas(data);
+        const lojasData = await getLojas();
+        setLojas(lojasData);
       } catch (err) {
         console.error('Erro ao carregar lojas:', err);
         setError('Erro ao carregar lojas: ' + err);
@@ -109,46 +101,47 @@ export default function NovoPedidoPage() {
   // Verifica se o formulário é válido
   const isFormValid = () => {
     const { lojaId, cep, numero, destinatario, peso, dimensoes, valor } = formData;
-  
+
     // Verifica se todos os campos obrigatórios estão preenchidos
     if (!lojaId) {
       setError('Selecione uma loja de origem.');
       return false;
     }
-  
+
     if (!cep || cep.length !== 8 || !endereco) {
       setError('CEP inválido ou incompleto.');
       return false;
     }
-  
+
     if (!numero) {
       setError('O número do endereço é obrigatório.');
       return false;
     }
-  
+
     if (!destinatario) {
       setError('O destinatário é obrigatório.');
       return false;
     }
-  
+
     if (!peso) {
       setError('Selecione o peso do pedido.');
       return false;
     }
-  
+
     if (!dimensoes) {
       setError('Selecione as dimensões do pedido.');
       return false;
     }
-  
+
     if (!valor || parseFloat(valor) <= 0) {
       setError('O valor deve ser maior que zero.');
       return false;
     }
-  
+
     setError(null); // Limpa erros se tudo estiver correto
     return true;
   };
+
   // Função para baixar o PDF
   const handleDownload = () => {
     if (pdfUrl) {
@@ -180,6 +173,12 @@ export default function NovoPedidoPage() {
       return;
     }
 
+    // Validação adicional para lojaId
+    if (!formData.lojaId) {
+      setError('Selecione uma loja de origem');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -192,31 +191,33 @@ export default function NovoPedidoPage() {
         ? `${endereco.logradouro}, ${formData.numero}${formData.complemento ? `, ${formData.complemento}` : ''}, ${endereco.bairro}, ${endereco.localidade} - ${endereco.uf}`
         : '';
 
-      // Criar pedido
-      const pedidoResponse = await fetch('http://localhost:5000/api/pedidos', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          codigo,
-          remetente: lojas.find((loja) => loja.id === parseInt(formData.lojaId))?.nome,
-          destinatario: formData.destinatario,
-          endereco_completo: enderecoCompleto,
-          peso: formData.peso,
-          dimensoes: formData.dimensoes,
-          valor: parseFloat(formData.valor),
-          origem: formData.lojaId,
-        }),
+      // Log para depuração
+      console.log('Dados enviados para createPedido:', {
+        codigo,
+        remetente: lojas.find((loja) => loja.id === Number(formData.lojaId))?.nome,
+        destinatario: formData.destinatario,
+        endereco_completo: enderecoCompleto,
+        peso: parseFloat(formData.peso),
+        dimensoes: formData.dimensoes,
+        valor: parseFloat(formData.valor),
+        origem: Number(formData.lojaId),
+        usuario_id: user?.id || 0,
       });
 
-      if (!pedidoResponse.ok) {
-        const errorData = await pedidoResponse.json();
-        throw new Error(errorData.error || 'Erro ao criar pedido');
-      }
+      // Criar pedido usando createPedido
+      const pedidoResponse = await createPedido({
+        codigo,
+        remetente: lojas.find((loja) => loja.id === Number(formData.lojaId))?.nome || '',
+        destinatario: formData.destinatario,
+        endereco_completo: enderecoCompleto,
+        peso: parseFloat(formData.peso),
+        dimensoes: formData.dimensoes,
+        valor: parseFloat(formData.valor),
+        origem: Number(formData.lojaId), // Converter string para número
+        usuario_id: user?.id || 0,
+      });
 
-      const { id: pedidoId } = await pedidoResponse.json();
+      const pedidoId = pedidoResponse.id;
 
       // Gerar etiqueta
       const etiquetaResponse = await fetch('http://localhost:5000/api/etiquetas', {
@@ -262,8 +263,7 @@ export default function NovoPedidoPage() {
               </Link>
               <h1 className="text-xl font-bold">Novo Pedido</h1>
             </div>
-            <div className="flex items-center space-x-4">
-            </div>
+            <div className="flex items-center space-x-4"></div>
           </div>
         </header>
 

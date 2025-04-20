@@ -105,13 +105,14 @@ app.get('/api/usuarios', authenticateToken, checkAccessLevel('admin'), async (re
 
 app.post('/api/usuarios', authenticateToken, checkAccessLevel('admin'), async (req, res) => {
   try {
-    const { nivel_acesso, loja_id } = req.body;
+    const { nome, email, senha, nivel_acesso, loja_id } = req.body;
     
-    // Validação: só funcionários podem ter loja associada
-    if (nivel_acesso !== 'funcionario' && loja_id) {
-      return res.status(400).json({ 
-        error: 'Apenas funcionários podem ter loja associada' 
-      });
+    // Validação: loja_id deve existir, se fornecido
+    if (loja_id) {
+      const [loja] = await pool.query('SELECT id FROM lojas WHERE id = ?', [loja_id]);
+      if (loja.length === 0) {
+        return res.status(400).json({ error: 'Loja especificada não existe' });
+      }
     }
 
     // Hash da senha
@@ -195,14 +196,14 @@ app.get('/api/lojas', authenticateToken, async (req, res) => {
     // Clientes só veem sua própria loja (se tiver uma associada)
     if (req.user.nivel_acesso === 'cliente') {
       const [loja] = await pool.query(
-        'SELECT id, nome FROM lojas WHERE id = (SELECT loja_id FROM usuarios WHERE id = ?)',
+        'SELECT id, nome, endereco FROM lojas WHERE id = (SELECT loja_id FROM usuarios WHERE id = ?)',
         [req.user.id]
       );
       return res.json(loja);
     }
     
     // Funcionários e admin veem todas as lojas
-    const [lojas] = await pool.query('SELECT id, nome FROM lojas');
+    const [lojas] = await pool.query('SELECT id, nome, endereco FROM lojas');
     res.json(lojas);
   } catch (error) {
     console.error('Erro ao buscar lojas:', error);
@@ -232,17 +233,32 @@ app.get('/api/pedidos', authenticateToken, async (req, res) => {
 });
 
 // Rota para criar pedidos (funcionario e admin)
-app.post('/api/pedidos', authenticateToken, checkAccessLevel('funcionario'), async (req, res) => {
+app.post('/api/pedidos', authenticateToken, async (req, res) => {
   try {
     const { codigo, remetente, destinatario, endereco_completo, peso, dimensoes, valor, origem } = req.body;
-
+    // Converter origem para número
+    const origemId = Number(origem);
+    if (isNaN(origemId)) {
+      return res.status(400).json({ error: 'ID da loja de origem inválido' });
+    }
+    // Para clientes, validar que a origem é a loja associada
+    if (req.user.nivel_acesso === 'cliente') {
+      const [user] = await pool.query('SELECT loja_id FROM usuarios WHERE id = ?', [req.user.id]);
+      if (!user[0].loja_id || user[0].loja_id !== origemId) {
+        return res.status(403).json({ error: 'Clientes só podem criar pedidos a partir de sua loja associada' });
+      }
+    }
+    // Validar que a loja de origem existe
+    const [loja] = await pool.query('SELECT id FROM lojas WHERE id = ?', [origemId]);
+    if (loja.length === 0) {
+      return res.status(400).json({ error: 'Loja de origem inválida' });
+    }
     const [result] = await pool.query(
       `INSERT INTO pedidos 
       (codigo, remetente, destinatario, endereco_completo, peso, dimensoes, valor, origem, usuario_id) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [codigo, remetente, destinatario, endereco_completo, peso, dimensoes, valor, origem, req.user.id]
+      [codigo, remetente, destinatario, endereco_completo, peso, dimensoes, valor, origemId, req.user.id]
     );
-
     await registrarAtividade(`Novo pedido criado (#${codigo})`, req.user.id);
     res.status(201).json({ id: result.insertId });
   } catch (error) {

@@ -265,6 +265,34 @@ export const getLojas = async (): Promise<Loja[]> => {
   return response.json();
 };
 
+export const createPedido = async (data: {
+  codigo: string;
+  remetente: string;
+  destinatario: string;
+  endereco_completo: string;
+  peso: number;
+  dimensoes: string;
+  valor: number;
+  origem: number;
+  usuario_id: number;
+}): Promise<any> => {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
+  const response = await fetch(`${API_URL}/pedidos`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Erro ao criar pedido');
+  }
+  return response.json();
+};
+
 export const deleteLoja = async (id: number): Promise<void> => {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('Token de autenticação não encontrado');
