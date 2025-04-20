@@ -241,18 +241,16 @@ app.post('/api/pedidos', authenticateToken, checkAccessLevel('funcionario'), asy
 });
 
 app.post('/api/lojas', authenticateToken, checkAccessLevel('admin'), async (req, res) => {
+  console.log('Requisição recebida para criar loja:', req.body);
   try {
     const { nome, endereco } = req.body;
-
     if (!nome || !endereco) {
       return res.status(400).json({ error: 'Nome e endereço são obrigatórios' });
     }
-
     const [result] = await pool.query(
       'INSERT INTO lojas (nome, endereco) VALUES (?, ?)',
       [nome, endereco]
     );
-
     await registrarAtividade(`Nova loja criada: ${nome}`, req.user.id);
     res.status(201).json({ id: result.insertId });
   } catch (error) {
