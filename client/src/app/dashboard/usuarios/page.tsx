@@ -42,6 +42,7 @@ export default function UsuariosPage() {
     loja_id: '',
   });
   const [lojaFormData, setLojaFormData] = useState({
+    nome: '',
     cep: '',
     numero: '',
     endereco: '',
@@ -176,15 +177,13 @@ export default function UsuariosPage() {
 
   const handleLojaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lojaFormData.cep || !lojaFormData.numero || !lojaFormData.endereco) {
+    if (!lojaFormData.nome || !lojaFormData.cep || !lojaFormData.numero || !lojaFormData.endereco) {
       toast.error('Por favor, preencha todos os campos obrigatórios');
       return;
     }
     try {
-      // Gerar nome da loja baseado no endereço
-      const nomeLoja = `Loja ${lojaFormData.endereco.split(',')[2]?.trim() || 'Padrão'}`; // Ex.: "Loja São Paulo"
       await createLoja({
-        nome: nomeLoja,
+        nome: lojaFormData.nome,
         endereco: lojaFormData.endereco,
       });
       toast.success('Loja criada com sucesso');
@@ -319,6 +318,7 @@ export default function UsuariosPage() {
 
   const resetLojaForm = () => {
     setLojaFormData({
+      nome: '',
       cep: '',
       numero: '',
       endereco: '',
@@ -815,6 +815,21 @@ export default function UsuariosPage() {
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Criar Nova Loja</h2>
                 <form onSubmit={handleLojaSubmit}>
                   <div className="space-y-4">
+                    <div>
+                      <label htmlFor="nome" className="block text-sm font-medium text-gray-900 mb-1">
+                        Nome da Loja
+                      </label>
+                      <input
+                        type="text"
+                        id="nome"
+                        name="nome"
+                        value={lojaFormData.nome}
+                        onChange={handleLojaInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        required
+                        placeholder="Ex.: Loja Centro"
+                      />
+                    </div>
                     <div>
                       <label htmlFor="cep" className="block text-sm font-medium text-gray-900 mb-1">
                         CEP
