@@ -232,6 +232,19 @@ app.get('/api/pedidos', authenticateToken, async (req, res) => {
   }
 });
 
+app.get('/api/pedidos/motoboy', authenticateToken, async (req, res) => {
+  try {
+    // Implemente a lógica específica para motoboys
+    const [pedidos] = await pool.query(
+      "SELECT * FROM pedidos WHERE status = 'em_transito'"
+    );
+    res.json(pedidos);
+  } catch (error) {
+    console.error('Erro ao buscar pedidos para motoboy:', error);
+    res.status(500).json({ error: 'Erro interno no servidor' });
+  }
+});
+
 // Rota para criar pedidos (funcionario e admin)
 app.post('/api/pedidos', authenticateToken, async (req, res) => {
   try {
