@@ -17,6 +17,23 @@ interface LoginResponse {
   token: string;
 }
 
+// Interface para os pedidos
+interface Pedido {
+  id: number;
+  codigo: string;
+  remetente: string;
+  destinatario: string;
+  status: string;
+  endereco_completo: string;
+}
+
+// Interface para as estatísticas de pedidos
+interface PedidoEstatisticas {
+  total: number;
+  emTransito: number;
+  entregues: number;
+}
+
 export const login = async (email: string, senha: string): Promise<LoginResponse> => {
   const response = await fetch(`${API_URL}/login`, {
     method: 'POST',
@@ -33,13 +50,6 @@ export const login = async (email: string, senha: string): Promise<LoginResponse
 
   return await response.json();
 };
-
-// Interface para as estatísticas de pedidos
-interface PedidoEstatisticas {
-  total: number;
-  emTransito: number;
-  entregues: number;
-}
 
 // Função para buscar atividades recentes
 export const getAtividadesRecentes = async (): Promise<any[]> => {
@@ -118,15 +128,6 @@ export const getPedidoEstatisticas = async (): Promise<PedidoEstatisticas> => {
   return await response.json();
 };
 
-// Interface para os pedidos
-interface Pedido {
-  id: number;
-  codigo: string;
-  remetente: string;
-  destinatario: string;
-  status: string;
-}
-
 // Função para buscar todos os pedidos
 export const getPedidos = async (): Promise<Pedido[]> => {
   const token = localStorage.getItem('token');
@@ -142,6 +143,47 @@ export const getPedidos = async (): Promise<Pedido[]> => {
   if (!response.ok) {
     const errorData = await response.json();
     throw new Error(errorData.error || 'Erro ao buscar pedidos');
+  }
+
+  return await response.json();
+};
+
+// Função para buscar pedidos do motoboy
+export const fetchPedidosMotoboy = async (): Promise<Pedido[]> => {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
+  const response = await fetch(`${API_URL}/pedidos/motoboy`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Erro ao buscar pedidos do motoboy');
+  }
+
+  return await response.json();
+};
+
+// Função para validar QR Code
+export const validateQRCode = async (qrData: string): Promise<Pedido> => {
+  const token = localStorage.getItem('token');
+  if (!token) throw new Error('Token de autenticação não encontrado');
+  const response = await fetch(`${API_URL}/validar-qr`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ qrData }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Erro ao validar QR Code');
   }
 
   return await response.json();
@@ -215,17 +257,51 @@ export const updateUsuario = async (
 };
 
 export const deleteUsuario = async (id: number): Promise<void> => {
-  const token = localStorage.getItem('token');
-  if (!token) throw new Error('Token de autenticação não encontrado');
-  const response = await fetch(`${API_URL}/usuarios/${id}`, {
-    method: 'DELETE',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Erro ao excluir usuário');
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Sessão expirada. Faça login novamente.');
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+
+    const response = await fetch(`${API_URL}/usuarios/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        throw new Error(`Falha ao processar resposta do servidor: ${response.statusText}`);
+      }
+
+      switch (response.status) {
+        case 401:
+          throw new Error('Não autorizado. Token inválido ou expirado.');
+        case 403:
+          throw new Error('Você não tem permissão para esta ação.');
+        case 404:
+          throw new Error('Usuário não encontrado.');
+        case 409:
+          throw new Error(errorData.message || 'O usuário possui registros associados e não pode ser excluído.');
+        case 500:
+          throw new Error(errorData.message || 'Erro interno no servidor. Tente novamente mais tarde.');
+        default:
+          throw new Error(errorData.message || `Erro ao excluir usuário: ${response.statusText}`);
+      }
+    }
+  } catch (error) {
+    throw error; // Re-lança outros erros
   }
 };
 
@@ -275,6 +351,7 @@ export const createPedido = async (data: {
   valor: number;
   origem: number;
   usuario_id: number;
+  motoboy_id?: number;
 }): Promise<any> => {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('Token de autenticação não encontrado');
@@ -296,7 +373,6 @@ export const createPedido = async (data: {
 export const deleteLoja = async (id: number): Promise<void> => {
   const token = localStorage.getItem('token');
   if (!token) throw new Error('Token de autenticação não encontrado');
-  // Corrigindo a URL para usar API_URL
   const response = await fetch(`${API_URL}/lojas/${id}`, {
     method: 'DELETE',
     headers: {

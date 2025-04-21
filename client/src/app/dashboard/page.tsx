@@ -4,10 +4,11 @@ import AuthGuard from '@/components/AuthGuard';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { FiPackage, FiTruck, FiCheckCircle, FiUser, FiPlus, FiList, FiUsers, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
+import { FiPackage, FiTruck, FiCheckCircle, FiUser, FiPlus, FiList, FiUsers, FiChevronLeft, FiChevronRight, FiCamera } from 'react-icons/fi';
 import LogoutButton from '@/components/LogoutButton';
-import { useEffect, useState } from 'react';
-import { getPedidoEstatisticas, getAtividadesRecentes } from '@/services/api';
+import { useEffect, useState, useRef } from 'react';
+import { getPedidoEstatisticas, getAtividadesRecentes, fetchPedidosMotoboy, validateQRCode, updatePedidoStatus } from '@/services/api';
+import jsQR from 'jsqr';
 
 const CountUpAnimation = ({
   endValue,
@@ -55,29 +56,48 @@ export default function DashboardPage() {
     entregues: number;
   } | null>(null);
   const [atividades, setAtividades] = useState<any[]>([]);
+  const [pedidosMotoboy, setPedidosMotoboy] = useState<{
+    id: number;
+    codigo: string;
+    remetente: string;
+    destinatario: string;
+    status: string;
+    endereco_completo: string;
+  }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Estado para controlar se a animação já foi executada
   const [hasAnimated, setHasAnimated] = useState(false);
-
-  // Estados para paginação
   const [currentPage, setCurrentPage] = useState(0);
   const itemsPerPage = 3;
   const totalPages = Math.ceil(atividades.length / itemsPerPage);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [pedido, setPedido] = useState<{
+    id: number;
+    codigo: string;
+    remetente: string;
+    destinatario: string;
+    status: string;
+    endereco_completo: string;
+  } | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Buscar estatísticas de pedidos
-        const data = await getPedidoEstatisticas();
-        setStats(data);
-
-        // Buscar atividades recentes
-        const atividadesData = await getAtividadesRecentes();
-        setAtividades(atividadesData);
-      } catch (err) {
+        if (user?.nivel_acesso === 'funcionario') {
+          const pedidosData = await fetchPedidosMotoboy();
+          setPedidosMotoboy(pedidosData);
+        } else {
+          const data = await getPedidoEstatisticas();
+          setStats(data);
+          const atividadesData = await getAtividadesRecentes();
+          setAtividades(atividadesData);
+        }
+      } catch (err: any) {
         console.error('Erro ao carregar dados:', err);
-        setError('Ocorreu um erro ao carregar os dados.');
+        setError(err.message || 'Ocorreu um erro ao carregar os dados.');
       } finally {
         setLoading(false);
       }
@@ -85,25 +105,95 @@ export default function DashboardPage() {
 
     fetchData();
 
-    // Configurar um temporizador para marcar a animação como concluída após a duração
     const animationTimer = setTimeout(() => {
       setHasAnimated(true);
-    }, 2000); // 2000ms = 2s, correspondendo à duração padrão da animação
+    }, 2000);
 
     return () => clearTimeout(animationTimer);
-  }, []);
+  }, [user]);
 
-  // Função para avançar página
+  const startScanning = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        setIsScanning(true);
+        scanQRCode();
+      }
+    } catch (err) {
+      setError('Erro ao acessar a câmera. Verifique as permissões ou use um dispositivo com câmera.');
+      console.error(err);
+    }
+  };
+
+  const stopScanning = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      setIsScanning(false);
+    }
+  };
+
+  const scanQRCode = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+    if (code) {
+      stopScanning();
+      validateQR(code.data);
+    } else if (isScanning) {
+      requestAnimationFrame(scanQRCode);
+    }
+  };
+
+  const validateQR = async (qrData: string) => {
+    try {
+      const response = await validateQRCode(qrData);
+      setPedido(response);
+      setError(null);
+      setModalOpen(true);
+    } catch (err: any) {
+      setError(err.message || 'QR Code inválido ou erro no servidor');
+      setModalOpen(false);
+    }
+  };
+
+  const confirmTransport = async () => {
+    if (!pedido) return;
+
+    try {
+      await updatePedidoStatus(pedido.id, 'em_transito');
+      setModalOpen(false);
+      setPedidosMotoboy(pedidosMotoboy.filter((p) => p.id !== pedido.id));
+      alert('Pedido marcado como em trânsito!');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao atualizar status do pedido');
+    }
+  };
+
   const nextPage = () => {
     setCurrentPage((prev) => (prev < totalPages - 1 ? prev + 1 : prev));
   };
 
-  // Função para voltar página
   const prevPage = () => {
     setCurrentPage((prev) => (prev > 0 ? prev - 1 : prev));
   };
 
-  // Obter atividades para a página atual
   const paginatedAtividades = atividades.slice(
     currentPage * itemsPerPage,
     (currentPage + 1) * itemsPerPage
@@ -131,6 +221,176 @@ export default function DashboardPage() {
     },
   };
 
+  // Layout para motoboys
+  if (user?.nivel_acesso === 'funcionario') {
+    return (
+      <AuthGuard>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100"
+        >
+          {/* Header */}
+          <motion.header
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 100 }}
+            className="bg-orange-600 text-white shadow-lg"
+          >
+            <div className="max-w-md mx-auto px-4 py-4 flex justify-between items-center">
+              <motion.div
+                initial={{ x: -20 }}
+                animate={{ x: 0 }}
+                className="flex items-center"
+              >
+                <div className="relative w-32 h-10">
+                  <Image
+                    src="/logo.png"
+                    alt="Logo ChamaLog"
+                    fill
+                    className="object-contain"
+                    priority
+                  />
+                </div>
+              </motion.div>
+              <motion.div
+                initial={{ x: 20 }}
+                animate={{ x: 0 }}
+                className="flex items-center space-x-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <FiUser className="text-orange-100" />
+                  <span className="font-semibold text-white">{user?.nome}</span>
+                </div>
+                <LogoutButton />
+              </motion.div>
+            </div>
+          </motion.header>
+
+          {/* Main Content */}
+          <motion.main
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="max-w-md mx-auto px-4 py-8"
+          >
+            {/* Resumo de Pedidos */}
+            <motion.div
+              variants={itemVariants}
+              className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 mb-6"
+            >
+              <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <FiPackage className="text-orange-500" />
+                <span>Seus Pedidos</span>
+              </h2>
+              <div className="space-y-4">
+                {loading ? (
+                  <p className="text-gray-700">Carregando pedidos...</p>
+                ) : pedidosMotoboy.length > 0 ? (
+                  pedidosMotoboy.map((pedido) => (
+                    <motion.div
+                      key={pedido.id}
+                      whileHover={{ scale: 1.02 }}
+                      className="flex justify-between items-center p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-white rounded-full shadow">
+                          <FiPackage className="text-orange-500" />
+                        </div>
+                        <div>
+                          <p className="text-gray-800 font-medium">Pedido #{pedido.codigo}</p>
+                          <p className="text-sm text-gray-600">{pedido.endereco_completo}</p>
+                        </div>
+                      </div>
+                      <span className="text-sm text-gray-600">{pedido.status}</span>
+                    </motion.div>
+                  ))
+                ) : (
+                  <p className="text-gray-700">Nenhum pedido atribuído.</p>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Ações Rápidas */}
+            <motion.div
+              variants={itemVariants}
+              className="bg-white p-6 rounded-xl shadow-lg border border-gray-100"
+            >
+              <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <FiCamera className="text-orange-500" />
+                <span>Ação Rápida</span>
+              </h2>
+              <div className="space-y-3">
+                {!isScanning ? (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    onClick={startScanning}
+                    className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all shadow-md"
+                  >
+                    <FiCamera />
+                    <span>Escanear Pedido</span>
+                  </motion.button>
+                ) : (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    onClick={stopScanning}
+                    className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-md"
+                  >
+                    <span>Parar Escaneamento</span>
+                  </motion.button>
+                )}
+                <video
+                  ref={videoRef}
+                  className={`w-full mt-4 ${isScanning ? 'block' : 'hidden'} rounded-lg`}
+                />
+                <canvas ref={canvasRef} className="hidden" />
+                {error && <p className="text-red-500 text-center mt-4">{error}</p>}
+              </div>
+            </motion.div>
+          </motion.main>
+
+          {/* Modal de Confirmação */}
+          {modalOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50"
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white p-6 rounded-xl max-w-sm w-full mx-4"
+              >
+                {pedido && (
+                  <>
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">Confirmar Pedido</h3>
+                    <p className="text-gray-800"><strong>Código:</strong> {pedido.codigo}</p>
+                    <p className="text-gray-800"><strong>Endereço:</strong> {pedido.endereco_completo}</p>
+                    <div className="flex gap-4 mt-6">
+                      <button
+                        onClick={confirmTransport}
+                        className="flex-1 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition"
+                      >
+                        Iniciar Transporte
+                      </button>
+                      <button
+                        onClick={() => setModalOpen(false)}
+                        className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </motion.div>
+      </AuthGuard>
+    );
+  }
+
+  // Layout original para outros usuários
   return (
     <AuthGuard>
       <motion.div
@@ -306,11 +566,10 @@ export default function DashboardPage() {
                         transition={{ delay: index * 0.1 }}
                         className="border-b border-gray-100 pb-3 last:border-0"
                       >
-                        <p className="text-sm font-medium text-gray-800">{atividade.action}</p>
-                        <p className="text-xs text-gray-600">{atividade.time}</p>
+                        <p className="text-sm font-medium text-gray-800">{atividade.descricao}</p>
+                        <p className="text-xs text-gray-600">{new Date(atividade.data_criacao).toLocaleString()}</p>
                       </motion.div>
                     ))}
-                    {/* Controles de paginação */}
                     {totalPages > 1 && (
                       <div className="flex justify-between items-center pt-2">
                         <button
@@ -340,7 +599,7 @@ export default function DashboardPage() {
             </motion.div>
           </div>
 
-          {/* Bloco de Bem-Vindo Modernizado com Estatísticas */}
+          {/* Bloco de Bem-Vindo */}
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -355,7 +614,6 @@ export default function DashboardPage() {
                 Aqui você pode gerenciar todos os pedidos, acompanhar entregas e monitorar o desempenho da sua operação.
               </p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {/* Estatística 1 - Faturamento */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -375,8 +633,6 @@ export default function DashboardPage() {
                   )}
                   <p className="text-xs text-gray-500 mt-1">+12% em relação ao mês passado</p>
                 </motion.div>
-
-                {/* Estatística 2 - Pedidos Ativos */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -396,8 +652,6 @@ export default function DashboardPage() {
                   )}
                   <p className="text-xs text-gray-500 mt-1">5 novos hoje</p>
                 </motion.div>
-
-                {/* Estatística 3 - Satisfação */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
