@@ -7,61 +7,8 @@ import { motion } from 'framer-motion';
 import { FiPackage, FiTruck, FiCheckCircle, FiUser, FiPlus, FiList, FiUsers, FiChevronLeft, FiChevronRight, FiCamera } from 'react-icons/fi';
 import LogoutButton from '@/components/LogoutButton';
 import { useEffect, useState, useRef } from 'react';
-import { getPedidoEstatisticas, getAtividadesRecentes } from '@/services/api';
+import { getPedidoEstatisticas, getAtividadesRecentes, fetchPedidosMotoboy, validateQRCode, updatePedidoStatus } from '@/services/api';
 import jsQR from 'jsqr';
-
-// Interface para pedidos do motoboy
-interface Pedido {
-  id: string;
-  endereco: string;
-  status: string;
-}
-
-// Função para buscar pedidos do motoboy (adicionada ao services/api)
-const fetchPedidosMotoboy = async (): Promise<Pedido[]> => {
-  const response = await fetch('/api/pedidos/motoboy', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
-    },
-  });
-  if (!response.ok) {
-    throw new Error('Erro ao carregar pedidos');
-  }
-  return response.json();
-};
-
-// Função para validar QR Code
-const validateQRCode = async (qrData: string): Promise<Pedido> => {
-  const response = await fetch('/api/validar-qr', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
-    },
-    body: JSON.stringify({ qrData }),
-  });
-  if (!response.ok) {
-    throw new Error('Erro ao validar QR Code');
-  }
-  return response.json();
-};
-
-// Função para atualizar status do pedido
-const updatePedidoStatus = async (pedidoId: string, status: string): Promise<void> => {
-  const response = await fetch(`/api/pedido/${pedidoId}/status`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
-    },
-    body: JSON.stringify({ status }),
-  });
-  if (!response.ok) {
-    throw new Error('Erro ao atualizar status');
-  }
-};
 
 const CountUpAnimation = ({
   endValue,
@@ -102,44 +49,66 @@ const CountUpAnimation = ({
 };
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<{
     total: number;
     emTransito: number;
     entregues: number;
   } | null>(null);
   const [atividades, setAtividades] = useState<any[]>([]);
-  const [pedidosMotoboy, setPedidosMotoboy] = useState<Pedido[]>([]);
+  const [pedidosMotoboy, setPedidosMotoboy] = useState<{
+    id: number;
+    codigo: string;
+    remetente: string;
+    destinatario: string;
+    status: string;
+    endereco_completo: string;
+  }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasAnimated, setHasAnimated] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const itemsPerPage = 3;
   const totalPages = Math.ceil(atividades.length / itemsPerPage);
-  // Estados para escaneamento
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [pedido, setPedido] = useState<Pedido | null>(null);
+  const [pedido, setPedido] = useState<{
+    id: number;
+    codigo: string;
+    remetente: string;
+    destinatario: string;
+    status: string;
+    endereco_completo: string;
+  } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
+    // Avoid running during SSR
+    if (typeof window === 'undefined') return;
+
     const fetchData = async () => {
+      // Wait for auth to complete
+      if (authLoading || !user) {
+        return;
+      }
+
       try {
-        if (user?.nivel_acesso === 'funcionario') {
-          // Carregar pedidos do motoboy
+        setLoading(true);
+        setError(null);
+
+        if (user.nivel_acesso === 'funcionario') {
           const pedidosData = await fetchPedidosMotoboy();
           setPedidosMotoboy(pedidosData);
         } else {
-          // Carregar dados padrão
           const data = await getPedidoEstatisticas();
           setStats(data);
           const atividadesData = await getAtividadesRecentes();
           setAtividades(atividadesData);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Erro ao carregar dados:', err);
-        setError('Ocorreu um erro ao carregar os dados.');
+        setError(err.message || 'Ocorreu um erro ao carregar os dados.');
       } finally {
         setLoading(false);
       }
@@ -152,9 +121,8 @@ export default function DashboardPage() {
     }, 2000);
 
     return () => clearTimeout(animationTimer);
-  }, [user]);
+  }, [user, authLoading]);
 
-  // Funções para escaneamento
   const startScanning = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -167,7 +135,8 @@ export default function DashboardPage() {
         scanQRCode();
       }
     } catch (err) {
-      setError('Erro ao acessar a câmera');
+      setError('Erro ao acessar a câmera. Verifique as permissões ou use um dispositivo com câmera.');
+      console.error(err);
     }
   };
 
@@ -209,8 +178,8 @@ export default function DashboardPage() {
       setPedido(response);
       setError(null);
       setModalOpen(true);
-    } catch (err) {
-      setError('QR Code inválido ou erro no servidor');
+    } catch (err: any) {
+      setError(err.message || 'QR Code inválido ou erro no servidor');
       setModalOpen(false);
     }
   };
@@ -219,12 +188,12 @@ export default function DashboardPage() {
     if (!pedido) return;
 
     try {
-      await updatePedidoStatus(pedido.id, 'em_transporte');
+      await updatePedidoStatus(pedido.id, 'em_transito');
       setModalOpen(false);
       setPedidosMotoboy(pedidosMotoboy.filter((p) => p.id !== pedido.id));
-      alert('Pedido marcado como em transporte!');
-    } catch (err) {
-      setError('Erro ao atualizar status do pedido');
+      alert('Pedido marcado como em trânsito!');
+    } catch (err: any) {
+      setError(err.message || 'Erro ao atualizar status do pedido');
     }
   };
 
@@ -328,6 +297,8 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {loading ? (
                   <p className="text-gray-700">Carregando pedidos...</p>
+                ) : error ? (
+                  <p className="text-red-500">{error}</p>
                 ) : pedidosMotoboy.length > 0 ? (
                   pedidosMotoboy.map((pedido) => (
                     <motion.div
@@ -340,8 +311,8 @@ export default function DashboardPage() {
                           <FiPackage className="text-orange-500" />
                         </div>
                         <div>
-                          <p className="text-gray-800 font-medium">Pedido {pedido.id}</p>
-                          <p className="text-sm text-gray-600">{pedido.endereco}</p>
+                          <p className="text-gray-800 font-medium">Pedido #{pedido.codigo}</p>
+                          <p className="text-sm text-gray-600">{pedido.endereco_completo}</p>
                         </div>
                       </div>
                       <span className="text-sm text-gray-600">{pedido.status}</span>
@@ -406,8 +377,8 @@ export default function DashboardPage() {
                 {pedido && (
                   <>
                     <h3 className="text-lg font-bold text-gray-900 mb-4">Confirmar Pedido</h3>
-                    <p className="text-gray-800"><strong>ID:</strong> {pedido.id}</p>
-                    <p className="text-gray-800"><strong>Endereço:</strong> {pedido.endereco}</p>
+                    <p className="text-gray-800"><strong>Código:</strong> {pedido.codigo}</p>
+                    <p className="text-gray-800"><strong>Endereço:</strong> {pedido.endereco_completo}</p>
                     <div className="flex gap-4 mt-6">
                       <button
                         onClick={confirmTransport}
@@ -608,8 +579,8 @@ export default function DashboardPage() {
                         transition={{ delay: index * 0.1 }}
                         className="border-b border-gray-100 pb-3 last:border-0"
                       >
-                        <p className="text-sm font-medium text-gray-800">{atividade.action}</p>
-                        <p className="text-xs text-gray-600">{atividade.time}</p>
+                        <p className="text-sm font-medium text-gray-800">{atividade.descricao}</p>
+                        <p className="text-xs text-gray-600">{new Date(atividade.data_criacao).toLocaleString()}</p>
                       </motion.div>
                     ))}
                     {totalPages > 1 && (
